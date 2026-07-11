@@ -1,0 +1,35 @@
+{
+  "name": "page-pilot-skills",
+  "version": "0.1.0",
+  "description": "Turns a page-pilot-recorder step array into a reusable, parameterized 'skill' — a review UI for naming values as swappable parameters, plus local storage. Step 1 of a larger AI-driven automation plan (recording + tagging now; AI retrieval/fill-in later).",
+  "type": "module",
+  "main": "page-pilot-skills.js",
+  "module": "page-pilot-skills.js",
+  "exports": {
+    ".": "./page-pilot-skills.js"
+  },
+  "files": [
+    "page-pilot-skills.js",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/browser-test.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.40.0",
+    "@sparticuz/chromium": "^149.0.0"
+  },
+  "keywords": [
+    "browser-automation",
+    "page-pilot",
+    "skills",
+    "automation-recording"
+  ],
+  "license": "MIT",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=16"
+  }
+}
