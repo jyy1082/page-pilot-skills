@@ -171,6 +171,136 @@ async function main() {
     await page.close();
   }
 
+  console.log('=== FULL ROUND TRIP: record, save as skill, fill with NEW values, replay through real PagePilot ===');
+  {
+    const page = await freshPage();
+    const result = await page.evaluate(async () => {
+      const { PagePilot } = await import('/page-pilot.js');
+
+      // Simulate a "recording": these are the values as originally typed.
+      const recordedSteps = [
+        { type: 'type', target: '#last-name', text: 'Smith' },
+        { type: 'select', target: '#country-select', value: 'us' },
+        { type: 'check', target: '#agree-checkbox', checked: true },
+        { type: 'click', target: '#save-btn' },
+      ];
+      const draft = window.Skills.buildSkillDraft('Fill out the form', recordedSteps, [
+        { stepIndex: 0, field: 'text', name: '姓氏' },
+        { stepIndex: 1, field: 'value', name: '国家' },
+        { stepIndex: 2, field: 'checked', name: '同意条款' },
+      ]);
+      const saved = window.Skills.saveSkill(draft, 'roundtrip-test.example.com');
+
+      // Reset the fixture, then run the skill with DIFFERENT values than
+      // what was originally recorded — this is the whole point: the same
+      // skill, reusable with new input.
+      document.getElementById('last-name').value = '';
+      document.getElementById('country-select').value = '';
+      document.getElementById('agree-checkbox').checked = false;
+      let saveBtnClicked = false;
+      document.getElementById('save-btn').addEventListener('click', () => { saveBtnClicked = true; });
+
+      const filledSteps = window.Skills.fillSkillParameters(saved, {
+        '姓氏': 'Tanaka',
+        '国家': 'jp',
+        '同意条款': true,
+      });
+
+      const cursor = new PagePilot({ moveDuration: 4, clickPause: 4 });
+      await cursor.run(filledSteps);
+      cursor.destroy();
+
+      return {
+        nameValue: document.getElementById('last-name').value,
+        countryValue: document.getElementById('country-select').value,
+        agreeChecked: document.getElementById('agree-checkbox').checked,
+        saveBtnClicked,
+      };
+    });
+    check('the NEW name value was typed correctly, not the originally recorded one', result.nameValue === 'Tanaka');
+    check('the NEW country was selected correctly', result.countryValue === 'jp');
+    check('the checkbox was correctly checked via the filled-in boolean', result.agreeChecked === true);
+    check('the unparameterized click step still ran normally', result.saveBtnClicked === true);
+    await page.close();
+  }
+
+  console.log('=== buildSkillDraft: checked (boolean) parameters keep their type, not corrupted to a string ===');
+  {
+    const page = await freshPage();
+    const result = await page.evaluate(() => {
+      const steps = [{ type: 'check', target: '#agree-checkbox', checked: true }];
+      const draft = window.Skills.buildSkillDraft('Test', steps, [{ stepIndex: 0, field: 'checked', name: '同意条款' }]);
+      return draft.steps[0];
+    });
+    check('checked stays a real boolean, not overwritten with a placeholder string', result.checked === true && typeof result.checked === 'boolean');
+    check('a separate marker records which parameter controls it', result.checkedParam === '同意条款');
+    await page.close();
+  }
+
+  console.log('=== fillSkillParameters: substitutes text/value placeholders and checked markers correctly ===');
+  {
+    const page = await freshPage();
+    const result = await page.evaluate(() => {
+      const skill = {
+        steps: [
+          { type: 'click', target: '#save-btn' },
+          { type: 'type', target: '#last-name', text: '{{姓氏}}' },
+          { type: 'select', target: '#country-select', value: '{{国家}}' },
+          { type: 'check', target: '#agree-checkbox', checked: false, checkedParam: '同意条款' },
+        ],
+        parameters: [{ name: '姓氏' }, { name: '国家' }, { name: '同意条款' }],
+      };
+      const filled = window.Skills.fillSkillParameters(skill, { '姓氏': 'Tanaka', '国家': 'jp', '同意条款': true });
+      return filled;
+    });
+    check('text placeholder correctly substituted', result[1].text === 'Tanaka');
+    check('value placeholder correctly substituted', result[2].value === 'jp');
+    check('checked marker correctly resolved to a real boolean', result[3].checked === true && typeof result[3].checked === 'boolean');
+    check('the checkedParam marker is cleaned up after filling', !('checkedParam' in result[3]));
+    check('an untouched step (no parameter) is unchanged', result[0].target === '#save-btn');
+    await page.close();
+  }
+
+  console.log('=== fillSkillParameters: a missing value leaves a visible placeholder instead of silently blanking it ===');
+  {
+    const page = await freshPage();
+    const result = await page.evaluate(() => {
+      const skill = {
+        steps: [{ type: 'type', target: '#last-name', text: '{{姓氏}}' }],
+        parameters: [{ name: '姓氏' }],
+      };
+      return window.Skills.fillSkillParameters(skill, {}); // no value provided at all
+    });
+    check('missing value stays as the literal {{name}} text, not silently emptied', result[0].text === '{{姓氏}}');
+    await page.close();
+  }
+
+  console.log('=== fillSkillParameters: a missing checked value falls back to the originally recorded boolean ===');
+  {
+    const page = await freshPage();
+    const result = await page.evaluate(() => {
+      const skill = {
+        steps: [{ type: 'check', target: '#agree-checkbox', checked: true, checkedParam: '同意条款' }],
+        parameters: [{ name: '同意条款' }],
+      };
+      return window.Skills.fillSkillParameters(skill, {}); // no value provided
+    });
+    check('falls back to the originally recorded checked value when none is provided', result[0].checked === true);
+    await page.close();
+  }
+
+  console.log('=== fillSkillParameters never mutates the skill passed in ===');
+  {
+    const page = await freshPage();
+    const result = await page.evaluate(() => {
+      const skill = { steps: [{ type: 'type', target: '#x', text: '{{姓氏}}' }], parameters: [{ name: '姓氏' }] };
+      window.Skills.fillSkillParameters(skill, { '姓氏': 'Changed' });
+      return skill.steps[0].text; // should still be the placeholder
+    });
+    check('the original skill object is never mutated', result === '{{姓氏}}');
+    await page.close();
+  }
+
   console.log('=== buildSkillDraft does not mutate the original steps array ===');
   {
     const page = await freshPage();

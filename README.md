@@ -2,7 +2,7 @@
 
 [中文](./README.zh-CN.md) · **English**
 
-**Version 0.1.0** · see [CHANGELOG.md](./CHANGELOG.md) for release history
+**Version 0.2.0** · see [CHANGELOG.md](./CHANGELOG.md) for release history
 
 Turns a [page-pilot-recorder](https://github.com/jyy1082/page-pilot-recorder)
 step array into a reusable, parameterized "skill": a short description, a
@@ -39,6 +39,19 @@ const skill = await showArchivePanel(steps)
 // and a high-risk checkbox. Picking "Save as skill" saves it (this
 // function does the saving itself) and resolves with the saved record;
 // picking "One-time use" resolves with null and saves nothing.
+```
+
+Later, to actually use a saved skill again with new values:
+
+```js
+import { listSkills, fillSkillParameters } from 'page-pilot-skills'
+import { PagePilot } from 'page-pilot'
+
+const skill = listSkills()[0] // or however you pick which one
+const steps = fillSkillParameters(skill, { 'Last Name': 'Tanaka', 'Department': 'Engineering' })
+
+const cursor = new PagePilot()
+await cursor.run(steps)
 ```
 
 ## What gets detected as a parameter candidate
@@ -115,6 +128,7 @@ A saved skill record looks like:
 | `listSkills(domain?)` | List saved skills for a domain, most recently updated first |
 | `getSkill(id, domain?)` | Get a single skill by id |
 | `deleteSkill(id, domain?)` | Delete a skill by id |
+| `fillSkillParameters(skill, values)` | Substitute real values back into a saved skill's placeholders, returning steps ready for `PagePilot.run()` |
 | `showArchivePanel(steps, options?)` | The full review UI; saves itself and resolves with the saved record, or `null` for "one-time use" |
 
 `domain` defaults to `location.hostname` everywhere it's an optional
@@ -123,13 +137,17 @@ parameter.
 ## What this does NOT do (by design, for now)
 
 - **No AI.** Nothing here calls out to any model. Detected parameter
-  names are suggestions from DOM inspection, not language understanding.
+  names are suggestions from DOM inspection, not language understanding;
+  `fillSkillParameters` does plain string substitution with values you
+  provide — it doesn't figure out what those values should be.
 - **No retrieval/matching.** There's no "find the skill that matches this
   new instruction" — that's the next layer, built on top of what this
   repo stores.
-- **No automatic parameter fill-in at run time.** A saved skill's steps
-  still have `{{name}}` placeholders in them; substituting real values
-  back in and running the result is also the next layer's job.
+- **No natural-language parameter extraction.** `fillSkillParameters`
+  handles substituting values back in once you have them (e.g. from a
+  form someone filled in), but turning a sentence like "add Jane Tanaka to
+  Engineering" into `{ "Last Name": "Tanaka", "Department": "Engineering" }`
+  is the next layer's job, not this one's.
 - **No cross-device sync.** Storage is plain `localStorage`, scoped to
   the browser it was saved in.
 

@@ -2,7 +2,7 @@
 
 **中文** · [English](./README.md)
 
-**版本 0.1.0** · 完整版本历史见 [CHANGELOG.md](./CHANGELOG.md)
+**版本 0.2.0** · 完整版本历史见 [CHANGELOG.md](./CHANGELOG.md)
 
 把 [page-pilot-recorder](https://github.com/jyy1082/page-pilot-recorder) 录制出来的步骤数组，转换成一个可复用、带参数的"技能"：一句简短描述、一份命名好的参数列表，以及把具体值替换成 `{{参数名}}` 占位符之后的原始步骤——这样同一段录制内容，以后换个值就能重新跑一遍，而不是被锁死在录制时打的那个具体值上。
 
@@ -26,6 +26,19 @@ const skill = await showArchivePanel(steps)
 // 步骤列表（每一条都能删掉）、以及一个"高风险"复选框。
 // 选"保存为技能"会自动保存（这个函数自己就会存，不需要额外调用）并返回保存好的记录；
 // 选"仅本次使用"会返回 null，什么都不保存。
+```
+
+以后想真正用上保存好的技能、换一批新的值再跑一遍：
+
+```js
+import { listSkills, fillSkillParameters } from 'page-pilot-skills'
+import { PagePilot } from 'page-pilot'
+
+const skill = listSkills()[0] // 或者随便什么方式挑一个
+const steps = fillSkillParameters(skill, { '姓氏': 'Tanaka', '部门': 'Engineering' })
+
+const cursor = new PagePilot()
+await cursor.run(steps)
 ```
 
 ## 什么会被识别成候选参数
@@ -77,15 +90,16 @@ const skill = await showArchivePanel(steps)
 | `listSkills(domain?)` | 列出某个域名下保存的技能，按最近更新时间排序 |
 | `getSkill(id, domain?)` | 按 id 获取单个技能 |
 | `deleteSkill(id, domain?)` | 按 id 删除技能 |
+| `fillSkillParameters(skill, values)` | 把真实值替换回保存好的技能里的占位符，返回可以直接交给 `PagePilot.run()` 的步骤 |
 | `showArchivePanel(steps, options?)` | 完整的确认界面；自己负责保存，返回保存好的记录，或者"仅本次使用"时返回 `null` |
 
 只要 `domain` 是可选参数的地方，默认值都是 `location.hostname`。
 
 ## 这个项目目前故意不做的事
 
-- **没有 AI。** 这里面任何地方都不会调用模型。检测到的参数名字建议，是基于 DOM 检查得出的，不是语言理解的结果。
+- **没有 AI。** 这里面任何地方都不会调用模型。检测到的参数名字建议，是基于 DOM 检查得出的，不是语言理解的结果；`fillSkillParameters` 做的是拿到你提供的值之后做纯字符串替换——它不会自己去搞清楚这些值该是什么。
 - **没有检索/匹配。** 没有"根据新指令找到对应技能"这种能力——这是下一层要做的，建立在这个仓库存下来的数据基础上。
-- **运行时不会自动填参数。** 保存好的技能里，步骤依然带着 `{{参数名}}` 占位符；把真实值换回去、再执行，同样是下一层的工作。
+- **没有自然语言参数提取。** `fillSkillParameters` 负责的是"已经拿到具体值之后，把它们填回去"（比如某个表单里用户自己填好的值），但把"帮田中加到工程部"这种一句话，转换成 `{ "姓氏": "田中", "部门": "工程部" }` 这种结构化数据，是下一层的工作，不是这个仓库该管的。
 - **不支持跨设备同步。** 存储用的是普通的 `localStorage`，只在保存时所在的那个浏览器里有效。
 
 ## 测试

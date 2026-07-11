@@ -1,6 +1,6 @@
 {
   "name": "page-pilot-skills",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Turns a page-pilot-recorder step array into a reusable, parameterized 'skill' — a review UI for naming values as swappable parameters, plus local storage. Step 1 of a larger AI-driven automation plan (recording + tagging now; AI retrieval/fill-in later).",
   "type": "module",
   "main": "page-pilot-skills.js",

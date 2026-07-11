@@ -214,7 +214,16 @@ export function buildSkillDraft(description, steps, acceptedParams) {
   for (const p of acceptedParams) {
     const step = stepsCopy[p.stepIndex];
     if (!step) continue;
-    step[p.field] = `{{${p.name}}}`;
+    if (p.field === 'checked') {
+      // `checked` is a boolean, not a string — writing "{{name}}" directly
+      // into it would silently turn it into a string and break check()'s
+      // type contract at run time. Use a separate marker instead, keeping
+      // the originally recorded boolean in place as a safe fallback for
+      // anything that fills the skill in without providing this value.
+      step.checkedParam = p.name;
+    } else {
+      step[p.field] = `{{${p.name}}}`;
+    }
   }
   return {
     description,
@@ -223,6 +232,38 @@ export function buildSkillDraft(description, steps, acceptedParams) {
     fragile: hasFragileSteps(steps),
     highRisk: isHighRisk(steps),
   };
+}
+
+/**
+ * Substitute real values back into a saved skill's steps: replaces every
+ * `{{name}}` occurrence inside a step's `text`/`value` string with
+ * `values[name]` (leaving it as the literal `{{name}}` text if that name
+ * isn't in `values`, rather than silently blanking it out — a visible
+ * placeholder left behind is much easier to notice and fix than an empty
+ * string quietly going into a form field), and sets `checked` from
+ * `values[step.checkedParam]` for any checkbox/radio parameter (falling
+ * back to the originally recorded boolean if that name isn't provided).
+ * Returns a new steps array — never mutates the skill passed in.
+ */
+export function fillSkillParameters(skill, values) {
+  return skill.steps.map((step) => {
+    const copy = { ...step };
+    if (copy.checkedParam) {
+      if (Object.prototype.hasOwnProperty.call(values, copy.checkedParam)) {
+        copy.checked = !!values[copy.checkedParam];
+      }
+      delete copy.checkedParam;
+    }
+    for (const field of ['text', 'value']) {
+      if (typeof copy[field] === 'string') {
+        copy[field] = copy[field].replace(/\{\{(.+?)\}\}/g, (match, name) => {
+          const trimmed = name.trim();
+          return Object.prototype.hasOwnProperty.call(values, trimmed) ? values[trimmed] : match;
+        });
+      }
+    }
+    return copy;
+  });
 }
 
 // --- storage ----------------------------------------------------------

@@ -3,6 +3,32 @@
 All notable changes to this project are documented in this file, following
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.0]
+
+### Fixed
+- `buildSkillDraft` overwrote a `check` step's `checked` boolean with a
+  literal `"{{name}}"` *string* placeholder — silently corrupting its
+  type. Any code (like `PagePilot.check()`) expecting a real boolean would
+  have received a truthy string instead, regardless of what value was
+  actually meant. Now uses a separate `checkedParam` marker property,
+  leaving `checked` as the originally recorded boolean (a safe fallback if
+  a value isn't provided when filling the skill back in later).
+
+### Added
+- `fillSkillParameters(skill, values)` — substitutes real values back into
+  a saved skill's `{{name}}` placeholders (and `checkedParam` markers),
+  returning a fresh steps array ready to hand to `PagePilot.run()`. A
+  missing value leaves the literal `{{name}}` text in place rather than
+  silently blanking it out (much easier to notice something's wrong), and
+  a missing checked value falls back to what was originally recorded.
+  Never mutates the skill passed in. This is what actually makes a saved
+  skill usable again — `buildSkillDraft`/`saveSkill` alone only get you as
+  far as storing one.
+- 6 new real-browser tests, including a full round trip: record → save as
+  a skill → fill with values different from what was originally recorded
+  → replay through a real `PagePilot.run()` → confirm the new values (not
+  the recorded ones) actually land in the page.
+
 ## [0.1.0] — Initial release
 
 ### Added
